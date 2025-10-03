@@ -1,0 +1,16 @@
+FROM alpine:3.20
+
+# Tools + Dante
+RUN apk add --no-cache dante-server bash coreutils iproute2
+
+# Runtime user (optional; we’ll default to 'nobody' in config)
+# RUN addgroup -S dante && adduser -S -G dante dante
+
+# Copy template config and entrypoint
+COPY danted.conf.tmpl /etc/danted.conf.tmpl
+COPY entrypoint-dante.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 1080
+
+ENTRYPOINT ["/entrypoint.sh"]

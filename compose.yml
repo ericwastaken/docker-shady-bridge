@@ -1,0 +1,55 @@
+services:
+  dante:
+    build:
+      context: .
+      dockerfile: Dockerfile-dante
+    container_name: shadybridge-dante
+    restart: unless-stopped
+    ports:
+      - "1080:1080"
+    # Route this hostname through the local nginx proxy by pinning it to nginx's static IP
+    extra_hosts:
+      - "${REDIR_HOSTNAME}:172.30.0.3"
+    environment:
+      - REDIR_HOSTNAME               # reference from .env
+      - REDIR_IP                     # reference form .env
+      # Optional: tighten LAN access or tweak runtime opts
+      - DANTED_EXTERNAL=eth0         # if you want to pin it
+      - DANTED_USER=nobody           # or "dante" if you add the user in Dockerfile-dante
+      - ALLOW_FROM=0.0.0.0/0
+    healthcheck:
+      test: ["CMD", "sh", "-lc", "nc -z 127.0.0.1 1080"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      - nginx
+    networks:
+      - shadybridge
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile-nginx
+    container_name: shadybridge-nginx
+    restart: unless-stopped
+    environment:
+      - REDIR_HOSTNAME
+      - REDIR_IP
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      shadybridge:
+        ipv4_address: 172.30.0.3
+
+networks:
+  shadybridge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/29

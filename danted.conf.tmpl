@@ -1,0 +1,21 @@
+logoutput: stderr
+
+internal: 0.0.0.0 port = 1080
+external: __EXTERNAL_IF__
+
+user.privileged: root
+user.notprivileged: __DANTED_USER__
+
+clientmethod: none
+socksmethod: none
+
+client pass {
+    from: __ALLOW_FROM__ to: 0.0.0.0/0
+    log: error
+}
+
+socks pass {
+    from: __ALLOW_FROM__ to: 0.0.0.0/0
+    command: connect udpassociate
+    log: error
+}
