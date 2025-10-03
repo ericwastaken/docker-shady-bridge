@@ -9,6 +9,8 @@ This guide explains how to install and trust a custom Certificate Authority (CA)
 
 ## 2. Transfer to the Device
 You can get the certificate file onto your iPhone/iPad using one of the following:
+- **WEB / HTTP**: open a browser and navigate to `http://<host>:8080`. A page will provide a link to download the CA
+  certificate.
 - **AirDrop** the `ca.crt` file from your Mac.
 - **Email** the file to yourself and open it in the Mail app.
 - **Host it temporarily** on your local web server and download via Safari.

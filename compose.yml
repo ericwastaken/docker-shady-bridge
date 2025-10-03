@@ -11,6 +11,12 @@ services:
       - "--log-facility=-"
     volumes:
       - ./dnsmasq.d:/etc/dnsmasq.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nslookup www.google.com 127.0.0.1 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     networks:
       shadybridge:
         ipv4_address: 172.30.0.2
@@ -59,6 +65,18 @@ services:
     networks:
       shadybridge:
         ipv4_address: 172.30.0.3
+
+  ca-host:
+    image: nginx:alpine
+    container_name: shadybridge-ca-host
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./www:/usr/share/nginx/html
+      - ./certs:/usr/share/nginx/html/certs:ro
+    networks:
+      - shadybridge
 
 networks:
   shadybridge:

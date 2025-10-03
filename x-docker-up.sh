@@ -28,6 +28,8 @@ docker compose ps || true
 echo ""
 echo "[x-docker-up] Endpoints:"
 echo " - Dante SOCKS5: tcp://<this-host>:1080"
+echo " - CA download (web): http://<this-host>:8080/"
+echo "   Direct CA:         http://<this-host>:8080/certs/ca.crt"
 echo ""
 echo "[x-docker-up] Tip: If this is your first run, install/trust ./certs/ca.crt on your client."
 echo "[x-docker-up] Done."

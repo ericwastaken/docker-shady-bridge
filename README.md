@@ -113,6 +113,9 @@ the client.
   ```bash
   ./x-docker-up.sh
   ```
+- After startup, a simple local web page serves the CA certificate for easy download:
+  - CA download page: http://<this-host>:8080/
+  - Direct file:      http://<this-host>:8080/certs/ca.crt
 
 4) Point your client at the SOCKS5 proxy
 - SOCKS5 endpoint: host running Docker, port 1080 (mapped from the Dante container).
@@ -122,7 +125,9 @@ the client.
 
 5) Install and trust the test CA on the client
 - For iOS: see [README - IOS CA Cert Install.md](./README%20-%20IOS%20CA%20Cert%20Install.md).
-- For desktop/macOS browsers and tools, import ./certs/ca.crt (PEM) into the system or app trust store.
+- For Android: see [README - ANDROID CA Cert Install.md](./README%20-%20ANDROID%20CA%20Cert%20Install.md).
+- For desktop/macOS browsers and tools, import ./certs/ca.crt (PEM) into the system or app trust store. Alternatively, 
+  download it from the local CA web host at http://<this-host>:8080/ (direct: http://<this-host>:8080/certs/ca.crt).
 
 ## Configuration with conf.yml
 conf.yml is the single source of truth for configuring which incoming hostnames ShadyBridge should intercept and which 
@@ -185,6 +190,10 @@ Notes and tips:
 - CA installation: [README - IOS CA Cert Install.md](./README%20-%20IOS%20CA%20Cert%20Install.md)
 - SOCKS proxy on iOS (Shadowrocket): [README - IOS SOCKS Proxy Setup.md](./README%20-%20IOS%20SOCKS%20Proxy%20Setup.md)
 
+## Client setup guides (Android)
+- CA installation: [README - ANDROID CA Cert Install.md](./README%20-%20ANDROID%20CA%20Cert%20Install.md)
+- SOCKS proxy on Android (Tun2Socks): [README - ANDROID SOCKS Proxy Setup.md](./README%20-%20ANDROID%20SOCKS%20Proxy%20Setup.md)
+
 ## Common scenarios
 - A/B backend testing: Map target hostnames to different backend IPs in dnsmasq.d/dns-hosts.
 - Traffic capture/instrumentation: Point hostnames to an instrumentation proxy upstream; keep ShadyBridge as the TLS 
@@ -194,7 +203,7 @@ Notes and tips:
 
 ## Troubleshooting
 - Client shows TLS errors:
-  - Ensure the client trusts ./certs/ca.crt. On iOS, follow the CA install guide and enable full trust for root certificates.
+  - Ensure the client trusts ./certs/ca.crt (or download it from http://<this-host>:8080/certs/ca.crt). On iOS, follow the CA install guide and enable full trust for root certificates.
   - Verify server.crt.pem SANs include the hostname(s) you’re testing. Re‑run ./x-generate-certs.sh after updating 
     dnsmasq.d/dns-hosts.
 - Cannot connect through SOCKS:

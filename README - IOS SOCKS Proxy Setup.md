@@ -24,8 +24,6 @@ SOCKS proxy.
 
 4. Tap **Done** to save.
 
----
-
 ## 3. Enable the Proxy
 1. On the Shadowrocket main screen, tap the **toggle switch** at the top.
 2. iOS will prompt to install a VPN configuration the first time:
@@ -33,15 +31,11 @@ SOCKS proxy.
     - Enter your device passcode or confirm with Face ID/Touch ID.
 3. The **VPN key icon** should appear in the status bar when active.
 
----
-
 ## 4. Verification
 - Open Safari and visit [https://ifconfig.me](https://ifconfig.me).  
   The IP shown should be your Mac/ISP’s external IP, not your mobile carrier’s.
 - Open https://yourhost.yourdomain.com  
   It should connect successfully through Dante. If you installed your CA cert, there should be no TLS warnings.
-
----
 
 ## 5. Notes
 - To **disable the proxy**, toggle Shadowrocket off. The VPN icon disappears and traffic flows normally.
@@ -49,8 +43,6 @@ SOCKS proxy.
   “Global” mode.
 - If you see TLS errors, ensure your CA certificate is trusted in iOS (see companion README).
 - Shadowrocket tunnels all app traffic (Wi-Fi and cellular) while enabled.
-
----
 
 ## ⚠️ Security Reminder
 - Only connect Shadowrocket to proxies you trust.
