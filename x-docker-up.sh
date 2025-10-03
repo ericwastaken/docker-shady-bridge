@@ -5,7 +5,7 @@ set -euo pipefail
 # Brings up the ShadyBridge stack.
 # - Validates environment and generates/validates certificates via x-build.sh
 # - Builds images (via x-build.sh)
-# - Starts the stack with `docker compose up -d`
+# - Restarts the stack: `docker compose down` then `docker compose up -d`
 #
 # Usage:
 #   ./x-docker-up.sh
@@ -18,6 +18,9 @@ cd "$ROOT_DIR"
 
 # Ensure build prerequisites and images are ready (this also runs cert generation)
 "${ROOT_DIR}/x-docker-build.sh"
+
+echo "[x-docker-up] Bringing down any existing docker compose stack..."
+docker compose down --remove-orphans || true
 
 echo "[x-docker-up] Starting docker compose stack..."
 docker compose up -d
