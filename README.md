@@ -70,8 +70,6 @@ the client.
 - x-docker-build.sh — Runs x-generate.sh and then docker compose build.
 - x-docker-up.sh — Convenience wrapper to build (via x-docker-build.sh) and start the stack with docker compose up -d.
 - x-show-certs.sh — Convenience script to output cert details (if present).
-- [README - IOS CA Cert Install.md](./README%20-%20IOS%20CA%20Cert%20Install.md) — Step‑by‑step iOS CA installation guide.
-- [README - IOS SOCKS Proxy Setup.md](./README%20-%20IOS%20SOCKS%20Proxy%20Setup.md) — iOS device SOCKS proxy setup (Shadowrocket) guide.
 
 ## Prerequisites
 - Docker and Docker Compose Plugin (docker compose v2+).
@@ -80,53 +78,54 @@ the client.
 
 ## Quick start
 1) Define host mappings in conf.yml (single source of truth)
-- Copy conf.template.yml to conf.yml and edit target hostnames with their backend IPs (first IP used). Example:
-  ```yaml
-  targets:
-    - host: example.com
-      ips:
-        - 93.184.216.34
-    - host: www.example.com
-      ips:
-        - 93.184.216.34
-    - host: api.example.com
-      ips:
-        - 203.0.113.10
-  ```
-- All hostnames will resolve (via dnsmasq) to the internal NGINX IP (172.30.0.3). NGINX will proxy each hostname to its 
-  configured backend IP over HTTPS.
-- A single SAN certificate will be created that includes all hostnames from conf.yml.
+   - Copy conf.template.yml to conf.yml and edit target hostnames with their backend IPs (first IP used). Example:
+     ```yaml
+     targets:
+       - host: example.com
+         ips:
+           - 93.184.216.34
+       - host: www.example.com
+         ips:
+           - 93.184.216.34
+       - host: api.example.com
+         ips:
+           - 203.0.113.10
+     ```
+   - All hostnames will resolve (via dnsmasq) to the internal NGINX IP (172.30.0.3). NGINX will proxy each hostname to its 
+     configured backend IP over HTTPS.
+   - A single SAN certificate will be created that includes all hostnames from conf.yml.
 
 2) Generate configs and certificates; build images
-- Run:
-  ```bash
-  ./x-docker-build.sh
-  ```
-- Behavior:
-  - Generates ./dnsmasq.d/dns-hosts with a single line mapping all hosts to 172.30.0.3 (the nginx container).
-  - Generates per-host NGINX server configs in ./conf-nginx/ based on conf.yml.
-  - Creates/validates the CA and server certificate covering all hostnames from conf.yml.
-  - Builds the Docker images.
+   - Run:
+     ```bash
+     ./x-docker-build.sh
+     ```
+   - Behavior:
+     - Generates ./dnsmasq.d/dns-hosts with a single line mapping all hosts to 172.30.0.3 (the nginx container).
+     - Generates per-host NGINX server configs in ./conf-nginx/ based on conf.yml.
+     - Creates/validates the CA and server certificate covering all hostnames from conf.yml.
+     - Builds the Docker images.
 
 3) Start services
-- Start:
-  ```bash
-  ./x-docker-up.sh
-  ```
-- After startup, a simple local web page serves the CA certificate for easy download:
-  - CA download page: http://<this-host>:8080/
-  - Direct file:      http://<this-host>:8080/certs/ca.crt
+   - Start:
+     ```bash
+     ./x-docker-up.sh
+     ```
+   - After startup, a simple local web page serves the CA certificate for easy download:
+     - CA download page: http://<this-host>:8080/
+     - Direct file:      http://<this-host>:8080/certs/ca.crt
 
 4) Point your client at the SOCKS5 proxy
-- SOCKS5 endpoint: host running Docker, port 1080 (mapped from the Dante container).
-- Ensure your client traffic uses the SOCKS5 proxy, including passing DNS requests through the proxy. Inside the stack, 
-  Dante resolves hostnames via the dnsmasq sidecar, which can override specific hosts to point to nginx (172.30.0.3).
-- For iOS, use the Shadowrocket setup guide below. See: [README - IOS SOCKS Proxy Setup.md](./README%20-%20IOS%20SOCKS%20Proxy%20Setup.md)
+   - SOCKS5 endpoint: host running Docker, port 1080 (mapped from the Dante container).
+   - Ensure your client traffic uses the SOCKS5 proxy, including passing DNS requests through the proxy. Inside the stack, 
+     Dante resolves hostnames via the dnsmasq sidecar, which can override specific hosts to point to nginx (172.30.0.3).
+   - For iOS, use the Shadowrocket setup guide below. See: [README - IOS SOCKS Proxy Setup.md](./README%20-%20IOS%20SOCKS%20Proxy%20Setup.md)
+   - For Android, use the Tun2Socks setup guide below. See: [README - ANDROID SOCKS Proxy Setup.md](./README%20-%20ANDROID%20SOCKS%20Proxy%20Setup.md)
 
 5) Install and trust the test CA on the client
-- For iOS: see [README - IOS CA Cert Install.md](./README%20-%20IOS%20CA%20Cert%20Install.md).
-- For Android: see [README - ANDROID CA Cert Install.md](./README%20-%20ANDROID%20CA%20Cert%20Install.md).
-- For desktop/macOS browsers and tools, import ./certs/ca.crt (PEM) into the system or app trust store. Alternatively, 
+   - For iOS: see [README - IOS CA Cert Install.md](./README%20-%20IOS%20CA%20Cert%20Install.md).
+   - For Android: see [README - ANDROID CA Cert Install.md](./README%20-%20ANDROID%20CA%20Cert%20Install.md).
+   - For desktop/macOS browsers and tools, import ./certs/ca.crt (PEM) into the system or app trust store. Alternatively, 
   download it from the local CA web host at http://<this-host>:8080/ (direct: http://<this-host>:8080/certs/ca.crt).
 
 ## Configuration with conf.yml
