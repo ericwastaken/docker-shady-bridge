@@ -1,4 +1,20 @@
 services:
+  dns:
+    image: jpillora/dnsmasq:latest
+    container_name: shadybridge-dns
+    restart: unless-stopped
+    command:
+      - "--no-resolv"
+      - "--server=9.9.9.9"
+      - "--server=1.1.1.1"
+      - "--addn-hosts=/etc/dnsmasq.d/dns-hosts"
+      - "--log-facility=-"
+    volumes:
+      - ./dnsmasq.d:/etc/dnsmasq.d:ro
+    networks:
+      shadybridge:
+        ipv4_address: 172.30.0.2
+
   dante:
     build:
       context: .
@@ -7,12 +23,9 @@ services:
     restart: unless-stopped
     ports:
       - "1080:1080"
-    # Route this hostname through the local nginx proxy by pinning it to nginx's static IP
-    extra_hosts:
-      - "${REDIR_HOSTNAME}:172.30.0.3"
+    dns:
+      - 172.30.0.2
     environment:
-      - REDIR_HOSTNAME               # reference from .env
-      - REDIR_IP                     # reference form .env
       # Optional: tighten LAN access or tweak runtime opts
       - DANTED_EXTERNAL=eth0         # if you want to pin it
       - DANTED_USER=nobody           # or "dante" if you add the user in Dockerfile-dante
@@ -25,6 +38,7 @@ services:
       retries: 3
     depends_on:
       - nginx
+      - dns
     networks:
       - shadybridge
 
@@ -34,9 +48,8 @@ services:
       dockerfile: Dockerfile-nginx
     container_name: shadybridge-nginx
     restart: unless-stopped
-    environment:
-      - REDIR_HOSTNAME
-      - REDIR_IP
+    volumes:
+      - ./conf-nginx:/etc/nginx/conf.d:ro
     healthcheck:
       test: ["CMD-SHELL", "nginx -t || exit 1"]
       interval: 30s

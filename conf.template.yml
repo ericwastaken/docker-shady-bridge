@@ -1,0 +1,24 @@
+# conf.yml — single source of truth for target hostnames and their redirect IPs
+#
+# Schema:
+# targets:
+#   - host: host1.example.com
+#     ips:
+#       - 203.0.113.10   # first IP is used for proxying
+#   - host: host2.example.com
+#     ips:
+#       - 198.51.100.20
+#
+# Notes:
+# - All listed hosts will be resolved (via dnsmasq) to the internal NGINX container IP
+#   so that clients hit NGINX first. NGINX then proxies each host to its configured
+#   backend IP over HTTPS.
+# - The internal NGINX container IP defaults to 172.30.0.3.
+
+targets:
+  - host: api.yourhost.com
+    ips:
+      - x.x.x.x
+  - host: other.youthost.com
+    ips:
+      - x.x.x.x

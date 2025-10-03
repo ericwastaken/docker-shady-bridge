@@ -11,7 +11,6 @@ set -euo pipefail
 #   ./x-docker-up.sh
 #
 # Requirements:
-#   - .env with REDIR_HOSTNAME and REDIR_IP defined (REDITR_IP typo also supported via x-build.sh)
 #   - Docker and Docker Compose plugin installed
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"

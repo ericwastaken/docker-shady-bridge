@@ -2,37 +2,56 @@
 set -euo pipefail
 
 # x-generate-certs.sh
-# - Loads .env to read REDIR_HOSTNAME (and REDIR_IP for consistency)
-# - Uses an existing CA if present (ca.key.pem, ca.crt.pem); otherwise generates a local CA
-# - If server certs already exist, validates that they match the REDIR_HOSTNAME and are not expired soon
-#   - If valid: keep them and print a message
-#   - If invalid: remove server cert artifacts (keep CA) and regenerate
+# - Builds a SAN cert from hostnames listed in conf.yml (single source of truth)
+# - Uses an existing CA if present; otherwise generates a local CA
+# - Validates existing server cert (expiry and that it includes all hostnames); regenerates if needed
 # - Can be run standalone or invoked from x-docker-build.sh
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-ENV_FILE=".env"
 CERT_DIR="${ROOT_DIR}/certs"
+CONF_YML_PATH="${ROOT_DIR}/conf.yml"
 
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "[x-generate-certs] ERROR: ./.env not found. Please create it with REDIR_HOSTNAME (and REDIR_IP)." >&2
+# Collect hostnames from conf.yml (new schema only)
+HOSTS_FROM_FILE=()
+collect_hosts() {
+  awk '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+    # Schema: host: <name>
+    /host:[[:space:]]*/ {
+      line=$0; sub(/#.*/,"",line); split(line,a,":"); h=a[2]; gsub(/^[[:space:]]+|[[:space:]]+$/,"",h);
+      if (h!="") { print h }
+      next
+    }
+  ' "$CONF_YML_PATH" 2>/dev/null | sort -u || true
+}
+if command -v mapfile >/dev/null 2>&1; then
+  mapfile -t HOSTS_FROM_FILE < <(collect_hosts)
+else
+  while IFS= read -r __h; do
+    [[ -n "$__h" ]] && HOSTS_FROM_FILE+=("$__h")
+  done < <(collect_hosts)
+fi
+
+HOSTS=()
+if [[ ${#HOSTS_FROM_FILE[@]} -gt 0 ]]; then
+  HOSTS=("${HOSTS_FROM_FILE[@]}")
+fi
+
+# Ensure we have at least one hostname collected
+if [[ ${#HOSTS[@]} -eq 0 ]]; then
+  echo "[x-generate-certs] ERROR: No hostnames found in conf.yml (targets[].host)." >&2
   exit 1
 fi
 
-# Load .env safely into this shell
-set -a
-# shellcheck source=/dev/null
-. "$ENV_FILE"
-set +a
-
-# Support the common typo as fallback if present in the environment
-: "${REDITR_IP:=${REDIR_IP:-}}"
-
-HOST="${REDIR_HOSTNAME:-}"
-if [[ -z "$HOST" ]]; then
-  echo "[x-generate-certs] ERROR: .env must define REDIR_HOSTNAME." >&2
-  exit 1
+PRIMARY_CN="${HOSTS[0]}"
+# Determine server certificate CN: single host uses that host; multiple hosts use a generic label.
+if [[ ${#HOSTS[@]} -gt 1 ]]; then
+  SERVER_CN="Shady Bridge Various Hosts - see SAN"
+else
+  SERVER_CN="${PRIMARY_CN}"
 fi
 
 mkdir -p "$CERT_DIR"
@@ -49,9 +68,9 @@ if [[ -f ca.key.pem && -f ca.crt.pem ]]; then
   echo "[x-generate-certs] Using existing CA (ca.crt.pem)."
 else
   echo "[x-generate-certs] Generating local CA..."
+  CA_CN="Shady Bridge CA $(date -u '+%Y-%m-%d %H:%M:%S')"
   openssl genrsa -out ca.key.pem 4096 >/dev/null 2>&1
-  openssl req -x509 -new -nodes -key ca.key.pem -sha256 -days 3650 \
-    -out ca.crt.pem -subj "/C=US/ST=State/L=City/O=Local CA/OU=IT/CN=Local SOCKS CA Cert for Proxy Bypass" >/dev/null 2>&1
+  openssl req -x509 -new -nodes -key ca.key.pem -sha256 -days 3650 -out ca.crt.pem -subj "/C=US/ST=State/L=City/O=Local CA/OU=IT/CN=${CA_CN}" >/dev/null 2>&1
 fi
 
 # Ensure a copy of the CA cert is available as ca.crt (some tools expect this filename)
@@ -75,27 +94,30 @@ if [[ -f "$SERVER_KEY" && -f "$SERVER_CRT" ]]; then
     echo "[x-generate-certs] Existing cert is expired or expires within 24h. Will regenerate."
     need_regen=true
   else
-    # b) Check SAN contains the expected hostname
-    if openssl x509 -in "$SERVER_CRT" -noout -text 2>/dev/null | grep -A1 -i "Subject Alternative Name" | grep -q "DNS:${HOST}"; then
-      echo "[x-generate-certs] SAN validation passed for hostname '${HOST}'."
-    else
-      echo "[x-generate-certs] SAN validation failed (hostname mismatch). Will regenerate."
-      need_regen=true
-    fi
+    # b) Check SAN contains all expected hostnames
+    CERT_TEXT=$(openssl x509 -in "$SERVER_CRT" -noout -text 2>/dev/null || true)
+    for h in "${HOSTS[@]}"; do
+      if ! grep -q "DNS:${h}" <<<"$CERT_TEXT"; then
+        echo "[x-generate-certs] SAN validation failed (missing ${h}). Will regenerate."
+        need_regen=true
+        break
+      fi
+    done
   fi
 
-  # c) As a fallback, also check Subject CN when SAN block is missing
-  if [[ "$need_regen" == false ]]; then
-    if openssl x509 -in "$SERVER_CRT" -noout -subject 2>/dev/null | grep -q "CN=${HOST}"; then
+  # c) CN policy check: for single-host certs, CN should match the hostname.
+  # For multi-host certs we rely solely on SANs (RFC 6125) and skip CN enforcement.
+  if [[ "$need_regen" == false && ${#HOSTS[@]} -eq 1 ]]; then
+    if openssl x509 -in "$SERVER_CRT" -noout -subject 2>/dev/null | grep -q "CN=${PRIMARY_CN}"; then
       : # CN matches
     else
-      echo "[x-generate-certs] CN mismatch detected. Will regenerate."
+      echo "[x-generate-certs] CN mismatch detected for single-host cert. Will regenerate."
       need_regen=true
     fi
   fi
 
   if [[ "$need_regen" == false ]]; then
-    echo "[x-generate-certs] Existing certs are valid and match '${HOST}'. Keeping current certificates."
+    echo "[x-generate-certs] Existing certs are valid and include $((${#HOSTS[@]})) hostnames. Keeping current certificates."
     popd >/dev/null
     exit 0
   fi
@@ -104,14 +126,25 @@ if [[ -f "$SERVER_KEY" && -f "$SERVER_CRT" ]]; then
   rm -f "$SERVER_KEY" "$SERVER_CRT" "$SERVER_CSR" "$SERVER_EXT"
 fi
 
-# 3) Generate server key/cert for the hostname
-echo "[x-generate-certs] Generating server cert for ${HOST}..."
+# 3) Generate server key/cert for the hostnames
+echo "[x-generate-certs] Generating server cert for ${#HOSTS[@]} hostnames (CN=${SERVER_CN})..."
 openssl genrsa -out "$SERVER_KEY" 2048 >/dev/null 2>&1
-openssl req -new -key "$SERVER_KEY" -out "$SERVER_CSR" -subj "/C=US/ST=State/L=City/O=Proxy/CN=${HOST}" >/dev/null 2>&1
-cat > "$SERVER_EXT" <<EOF
-subjectAltName = DNS:${HOST}
-extendedKeyUsage = serverAuth
-EOF
+openssl req -new -key "$SERVER_KEY" -out "$SERVER_CSR" -subj "/C=US/ST=State/L=City/O=Proxy/CN=${SERVER_CN}" >/dev/null 2>&1
+
+# Build SAN list
+{
+  echo -n "subjectAltName = "
+  for idx in "${!HOSTS[@]}"; do
+    h="${HOSTS[$idx]}"
+    if [[ $idx -gt 0 ]]; then
+      echo -n ", "
+    fi
+    echo -n "DNS:${h}"
+  done
+  echo
+  echo "extendedKeyUsage = serverAuth"
+} > "$SERVER_EXT"
+
 openssl x509 -req -in "$SERVER_CSR" -CA ca.crt.pem -CAkey ca.key.pem -CAcreateserial \
   -out "$SERVER_CRT" -days 365 -sha256 -extfile "$SERVER_EXT" >/dev/null 2>&1
 
