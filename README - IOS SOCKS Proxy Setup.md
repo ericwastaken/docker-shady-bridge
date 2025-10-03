@@ -38,7 +38,7 @@ SOCKS proxy.
 ## 4. Verification
 - Open Safari and visit [https://ifconfig.me](https://ifconfig.me).  
   The IP shown should be your Mac/ISP’s external IP, not your mobile carrier’s.
-- Open [https://villaincon-gamehub.universalorlando.com](https://villaincon-gamehub.universalorlando.com).  
+- Open https://yourhost.yourdomain.com  
   It should connect successfully through Dante. If you installed your CA cert, there should be no TLS warnings.
 
 ---

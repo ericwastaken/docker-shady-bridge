@@ -62,10 +62,14 @@ the client.
 
 ## Quick start
 1) Clone and create a .env
-- Create a .env in the repo root with the hostname you want clients to request and the upstream IP to which nginx should proxy. Example:
+- Use template.env as the starting point for your .env. You can copy it and edit values:
+  ```bash
+  cp template.env .env
+  ```
+- Then set the hostname you want clients to request and the upstream IP to which nginx should proxy. Example:
 
 ```ini
-REDIR_HOSTNAME=villaincon-gamehub.universalorlando.com
+REDIR_HOSTNAME=server.somedomain.com
 REDIR_IP=203.0.113.45
 ```
 
