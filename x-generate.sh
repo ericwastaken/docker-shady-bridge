@@ -102,7 +102,8 @@ echo "[x-gen] Wrote ${DNS_HOSTS_FILE} with ${#ALL_HOSTS[@]} hostnames -> ${NGINX
 
 # 2) Generate per-host NGINX configs (last pair wins by overwriting)
 mkdir -p "$NGINX_OUT_DIR"
-find "$NGINX_OUT_DIR" -type f -name "*.conf" -delete 2>/dev/null || true
+# Preserve pinned/manual configs like 00-*.conf (e.g., 00-tuning.conf) by excluding them from deletion
+find "$NGINX_OUT_DIR" -type f -name "*.conf" ! -name "00-*" -delete 2>/dev/null || true
 
 for p in "${PAIRS[@]}"; do
   ip="${p%%|*}"; host="${p#*|}"

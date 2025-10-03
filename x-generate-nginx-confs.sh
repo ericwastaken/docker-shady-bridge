@@ -27,7 +27,8 @@ fi
 
 mkdir -p "$NGINX_OUT_DIR"
 # Clean previous generated files (only .conf files we own)
-find "$NGINX_OUT_DIR" -type f -name "*.conf" -delete 2>/dev/null || true
+# Preserve pinned/manual configs like 00-*.conf (e.g., 00-tuning.conf) by excluding them from deletion
+find "$NGINX_OUT_DIR" -type f -name "*.conf" ! -name "00-*" -delete 2>/dev/null || true
 
 # Parse file: for each line with an IP and one or more hostnames
 # We build mapping host->ip (last write wins if duplicates)
