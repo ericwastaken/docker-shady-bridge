@@ -33,7 +33,7 @@ find "$NGINX_OUT_DIR" -type f -name "*.conf" ! -name "00-*" -delete 2>/dev/null 
 # Parse file: for each line with an IP and one or more hostnames
 # We build mapping host->ip (last write wins if duplicates)
 # Internal NGINX container IP (static default)
-NGINX_IP="172.30.0.3"
+NGINX_IP="172.31.200.3"
 
 # Extract "<ip>|<host>" pairs from conf.yml (new schema only)
 read_pairs() {

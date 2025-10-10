@@ -36,7 +36,7 @@ if [[ ! -f "$NGINX_TEMPLATE" ]]; then
 fi
 
 # NGINX container IP static default to keep script portable.
-NGINX_IP="172.30.0.3"
+NGINX_IP="172.31.200.3"
 
 # Extract "<ip>|<host>" pairs from conf.yml (new schema only)
 read_pairs() {
