@@ -1,0 +1,39 @@
+# conf-nginx/00-proxy-headers.local.conf.example
+#
+# Activation:
+#   1) Copy this file to: conf-nginx/00-proxy-headers.local.conf
+#   2) Edit values as needed (do NOT commit secrets)
+#   3) Re-generate and build the stack, then bring it up:
+#        ./x-docker-build.sh
+#        ./x-docker-up.sh
+#
+# Notes:
+# - The ".example" suffix ensures nginx ignores this file by default.
+# - Using the "00-" prefix for the active file pins it so generator scripts
+#   won’t delete it and ensures it loads early (http context before servers).
+# - Safe defaults: when no override is specified, the original incoming header
+#   values are preserved.
+
+# Authorization: per-host override (defaults to incoming header)
+map $host $sb_auth {
+    default            $http_authorization;    # keep caller's header by default
+    # api.example.com    "Bearer MY_STATIC_TOKEN";
+}
+proxy_set_header Authorization $sb_auth;
+
+# User-Agent: per-host override (defaults to incoming header)
+map $host $sb_ua {
+    default            $http_user_agent;
+    # api.example.com    "My-UA/1.0 (ShadyBridge)";
+}
+proxy_set_header User-Agent $sb_ua;
+
+# Accept-Language: per-host override (defaults to incoming header)
+map $host $sb_accept_language {
+    default            $http_accept_language;
+    # api.example.com    "en-US";
+}
+proxy_set_header Accept-Language $sb_accept_language;
+
+# Tip: For a global override across all hosts, set a constant directly (uncomment):
+# proxy_set_header User-Agent "My-Global-UA/1.0";

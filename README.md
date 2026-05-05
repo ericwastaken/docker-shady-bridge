@@ -185,6 +185,67 @@ Notes and tips:
 - DANTED_USER — Optional. Runtime user for Dante (defaults to nobody).
 - ALLOW_FROM — Optional. CIDR allowed to connect to Dante (defaults to 0.0.0.0/0). Tighten this for LAN‑only access.
 
+## Overriding Headers
+You can override specific HTTP request headers that nginx forwards upstream without changing any code. This is useful for
+testing client behavior against stable or synthetic header values (e.g., `Authorization`, `User-Agent`, `Accept-Language`).
+
+- Example file (ignored by nginx): `./conf-nginx/00-proxy-headers.local.conf.example`
+- Activate by copying to: `./conf-nginx/00-proxy-headers.local.conf` (note the `00-` prefix)
+- Do NOT commit secrets contained in your local override file.
+
+Why `00-`? Files pinned with a `00-` prefix are preserved by the generator cleanup and are loaded early by nginx
+before the per‑host server blocks, allowing their settings to apply repo‑wide.
+
+Per‑host overrides (recommended): use `map` to provide a default that preserves the incoming header, and override only
+for specific hosts.
+
+```nginx
+# Authorization: per-host override (defaults to incoming header)
+map $host $sb_auth {
+    default            $http_authorization;    # keep caller's header by default
+    api.example.com    "Bearer MY_STATIC_TOKEN";
+}
+proxy_set_header Authorization $sb_auth;
+
+# User-Agent: per-host override
+map $host $sb_ua {
+    default            $http_user_agent;
+    api.example.com    "My-UA/1.0 (ShadyBridge)";
+}
+proxy_set_header User-Agent $sb_ua;
+
+# Accept-Language: per-host override
+map $host $sb_accept_language {
+    default            $http_accept_language;
+    api.example.com    "en-US";
+}
+proxy_set_header Accept-Language $sb_accept_language;
+```
+
+Global override (applies to all hosts):
+
+```nginx
+proxy_set_header User-Agent "My-Global-UA/1.0";
+```
+
+Activation and validation:
+
+1. Copy and edit the example file:
+   ```bash
+   cp ./conf-nginx/00-proxy-headers.local.conf.example ./conf-nginx/00-proxy-headers.local.conf
+   # edit ./conf-nginx/00-proxy-headers.local.conf with your values (do NOT commit secrets)
+   ```
+2. Re-generate and build the stack, then bring it up (as described above in this README):
+   ```bash
+   ./x-docker-build.sh
+   ./x-docker-up.sh
+   ```
+
+Notes:
+- The `.example` suffix ensures nginx ignores the tracked sample file until you activate it.
+- Quote values that contain spaces or special characters.
+- Prefer per‑host `map` rules to avoid leaking values to unintended upstreams.
+
 ## Client setup guides (iOS)
 - CA installation: [README - IOS CA Cert Install.md](./README%20-%20IOS%20CA%20Cert%20Install.md)
 - SOCKS proxy on iOS (Shadowrocket): [README - IOS SOCKS Proxy Setup.md](./README%20-%20IOS%20SOCKS%20Proxy%20Setup.md)
