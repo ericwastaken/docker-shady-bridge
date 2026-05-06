@@ -78,7 +78,9 @@ the client.
 
 ## Quick start
 1) Define host mappings in conf.yml (single source of truth)
-   - Copy conf.template.yml to conf.yml and edit target hostnames with their backend IPs (first IP used). Example:
+   - Copy conf.template.yml to conf.yml and edit target hostnames with their backend IPs (first IP used).
+   - Use the optional `upstream_host` field if the backend expects a specific Host/SNI (e.g. for routing or staging).
+   - Example:
      ```yaml
      targets:
        - host: example.com
@@ -90,6 +92,10 @@ the client.
        - host: api.example.com
          ips:
            - 203.0.113.10
+       - host: staging.example.com
+         ips:
+           - 203.0.113.10
+         upstream_host: staging-backend.internal.example.com
      ```
    - All hostnames will resolve (via dnsmasq) to the internal NGINX IP (172.30.0.3). NGINX will proxy each hostname to its 
      configured backend IP over HTTPS.
@@ -137,6 +143,7 @@ upstream backend IP each hostname should be proxied to.
   - targets: array of mappings
     - host: the exact hostname your client will request (e.g., api.example.com)
     - ips: list of backend IPs; the first entry is used for proxying
+    - upstream_host: (optional) the hostname used for the HTTP `Host` header and TLS SNI; defaults to the `host` field.
 - Example:
   ```yaml
   targets:
@@ -146,6 +153,10 @@ upstream backend IP each hostname should be proxied to.
     - host: www.example.com
       ips:
         - 93.184.216.34
+    - host: staging.example.com
+      ips:
+        - 203.0.113.10
+      upstream_host: staging-backend.internal.example.com
   ```
 - Behavior derived from conf.yml:
   - DNS: All listed hosts are written to ./dnsmasq.d/dns-hosts and resolve to the internal nginx container IP (default 
@@ -165,8 +176,7 @@ Workflow using conf.yml:
    - `./x-docker-up.sh`
 
 Notes and tips:
-- Upstream is contacted via HTTPS to the IP address you provide; proxy_ssl_server_name on ensures SNI uses the requested 
-  host.
+- **Upstream SNI & Host Headers**: Upstream is contacted via HTTPS to the IP address you provide. By default, the `Host` header and TLS SNI match the requested `host`. Use `upstream_host` if the backend expects a different name (e.g., when the backend uses SNI for routing to a specific virtual host, or if you are pointing a local developer domain at a shared staging endpoint).
 - The nginx internal IP defaults to 172.30.0.3; keep this in sync with compose.yml if you customize networks.
 - Only the first IP under ips is used. You can keep additional IPs for documentation or future use.
 

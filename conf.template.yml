@@ -5,6 +5,7 @@
 #   - host: host1.example.com
 #     ips:
 #       - 203.0.113.10   # first IP is used for proxying
+#     upstream_host: host1.example.com  # optional; defaults to host
 #   - host: host2.example.com
 #     ips:
 #       - 198.51.100.20
@@ -13,6 +14,8 @@
 # - All listed hosts will be resolved (via dnsmasq) to the internal NGINX container IP
 #   so that clients hit NGINX first. NGINX then proxies each host to its configured
 #   backend IP over HTTPS.
+# - The upstream_host (optional) is used for the HTTP Host header and TLS SNI;
+#   it defaults to the host field if omitted.
 # - The internal NGINX container IP defaults to 172.30.0.3.
 
 targets:

@@ -19,6 +19,9 @@ cd "$ROOT_DIR"
 # Ensure build prerequisites and images are ready (this also runs cert generation)
 "${ROOT_DIR}/x-docker-build.sh"
 
+# Determine the current hostname
+CURRENT_HOSTNAME=$(hostname)
+
 echo "[x-docker-up] Bringing down any existing docker compose stack..."
 docker compose down --remove-orphans || true
 
@@ -30,9 +33,9 @@ docker compose ps || true
 
 echo ""
 echo "[x-docker-up] Endpoints:"
-echo " - Dante SOCKS5: tcp://<this-host>:1080"
-echo " - CA download (web): http://<this-host>:8080/"
-echo "   Direct CA:         http://<this-host>:8080/certs/ca.crt"
+echo " - Dante SOCKS5: tcp://${CURRENT_HOSTNAME}:1080"
+echo " - CA download (web): http://${CURRENT_HOSTNAME}:8080/"
+echo "   Direct CA:         http://${CURRENT_HOSTNAME}:8080/certs/ca.crt"
 echo ""
 echo "[x-docker-up] Tip: If this is your first run, install/trust ./certs/ca.crt on your client."
 echo "[x-docker-up] Done."

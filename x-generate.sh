@@ -38,26 +38,46 @@ fi
 # NGINX container IP static default to keep script portable.
 NGINX_IP="172.31.200.3"
 
-# Extract "<ip>|<host>" pairs from conf.yml (new schema only)
+# Extract "<ip>|<host>|<upstream>" triples from conf.yml (new schema only)
 read_pairs() {
   awk '
-    BEGIN { host=""; ip=""; in_ips=0 }
+    function emit() {
+      if (host != "" && ip != "") {
+        oh = (up != "" ? up : host);
+        print ip "|" host "|" oh
+      }
+      host=""; ip=""; up=""; in_ips=0;
+    }
+    BEGIN { host=""; ip=""; up=""; in_ips=0 }
     /^[[:space:]]*#/ { next }
     /^[[:space:]]*$/ { next }
 
-    # Schema: host: <name>
-    /host:[[:space:]]*/ {
+    # Start of a new target list item
+    /^[[:space:]]*-[[:space:]]host:/ {
+      emit();
       line=$0; sub(/#.*/,"",line); split(line,a,":"); host=a[2]; gsub(/^[[:space:]]+|[[:space:]]+$/,"",host);
-      in_ips=0; ip=""; next
-    }
-    # Schema: ips:
-    /ips:[[:space:]]*$/ { in_ips=1; next }
-    # First list entry is used for backend mapping
-    in_ips && /^[[:space:]]*-[[:space:]]*/ {
-      val=$0; sub(/^[[:space:]]*-[[:space:]]*/,"",val); gsub(/^[[:space:]]+|[[:space:]]+$/,"",val);
-      if (ip=="" && host!="") { ip=val; if (ip!="") { print ip "|" host } }
       next
     }
+    # host field without list marker
+    /^[[:space:]]*host:[[:space:]]*/ {
+      emit();
+      line=$0; sub(/#.*/,"",line); split(line,a,":"); host=a[2]; gsub(/^[[:space:]]+|[[:space:]]+$/,"",host);
+      next
+    }
+    # upstream_host field
+    /^[[:space:]]*-?[[:space:]]*upstream_host:[[:space:]]*/ {
+      line=$0; sub(/#.*/,"",line); split(line,a,":"); u=a[2]; gsub(/^[[:space:]]+|[[:space:]]+$/,"",u);
+      up=u; next
+    }
+    # ips field
+    /ips:[[:space:]]*$/ { in_ips=1; next }
+    # first IP list entry
+    in_ips && /^[[:space:]]*-[[:space:]]*/ {
+      val=$0; sub(/^[[:space:]]*-[[:space:]]*/,"",val); gsub(/^[[:space:]]+|[[:space:]]+$/,"",val);
+      if (ip == "") ip=val;
+      next
+    }
+    END { emit(); }
   ' "$CONF_YML" | sed '/^[[:space:]]*$/d'
 }
 
@@ -106,12 +126,13 @@ mkdir -p "$NGINX_OUT_DIR"
 find "$NGINX_OUT_DIR" -type f -name "*.conf" ! -name "00-*" -delete 2>/dev/null || true
 
 for p in "${PAIRS[@]}"; do
-  ip="${p%%|*}"; host="${p#*|}"
+  IFS='|' read -r ip host upstream <<< "$p"
   out="${NGINX_OUT_DIR}/${host//[^A-Za-z0-9._-]/_}.conf"
   sed -e "s#__SERVER_NAME__#${host//\/\\}#g" \
       -e "s#__BACKEND_IP__#${ip//\/\\}#g" \
+      -e "s#__UPSTREAM_HOST__#${upstream//\/\\}#g" \
       "$NGINX_TEMPLATE" > "$out"
-  echo "[x-gen] NGINX: $host -> https://$ip (${out})"
+  echo "[x-gen] NGINX: $host -> https://$ip (SNI: $upstream) (${out})"
 done
 
 count=$(ls -1 "$NGINX_OUT_DIR"/*.conf 2>/dev/null | wc -l | tr -d ' ')
