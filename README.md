@@ -78,20 +78,23 @@ the client.
 
 ## Quick start
 1) Define host mappings in conf.yml (single source of truth)
-   - Copy conf.template.yml to conf.yml and edit target hostnames with their backend IPs (first IP used). Example:
+   - Copy conf.template.yml to conf.yml and edit target hostnames with their backend IPs (first IP used).
+   - Use the optional `upstream_host` field if the backend expects a specific Host/SNI (e.g. for routing or staging).
+   - Use the optional `override_headers` field to inject or replace headers like `Authorization`.
+   - Example:
      ```yaml
      targets:
-       - host: example.com
-         ips:
-           - 93.184.216.34
-       - host: www.example.com
-         ips:
-           - 93.184.216.34
        - host: api.example.com
          ips:
            - 203.0.113.10
+         override_headers:
+           - authorization: "Bearer MY_TOKEN"
+       - host: staging.example.com
+         ips:
+           - 203.0.113.10
+         upstream_host: staging-backend.internal.example.com
      ```
-   - All hostnames will resolve (via dnsmasq) to the internal NGINX IP (172.30.0.3). NGINX will proxy each hostname to its 
+   - All hostnames will resolve (via dnsmasq) to the internal NGINX IP (172.31.200.3). NGINX will proxy each hostname to its 
      configured backend IP over HTTPS.
    - A single SAN certificate will be created that includes all hostnames from conf.yml.
 
@@ -101,8 +104,9 @@ the client.
      ./x-docker-build.sh
      ```
    - Behavior:
-     - Generates ./dnsmasq.d/dns-hosts with a single line mapping all hosts to 172.30.0.3 (the nginx container).
+     - Generates ./dnsmasq.d/dns-hosts with a single line mapping all hosts to 172.31.200.3 (the nginx container).
      - Generates per-host NGINX server configs in ./conf-nginx/ based on conf.yml.
+     - Automates header overrides via `override_headers` in `conf.yml`.
      - Creates/validates the CA and server certificate covering all hostnames from conf.yml.
      - Builds the Docker images.
 
@@ -137,19 +141,24 @@ upstream backend IP each hostname should be proxied to.
   - targets: array of mappings
     - host: the exact hostname your client will request (e.g., api.example.com)
     - ips: list of backend IPs; the first entry is used for proxying
+    - upstream_host: (optional) the hostname used for the HTTP `Host` header and TLS SNI; defaults to the `host` field.
+    - override_headers: (optional) list of header key/value pairs to override on outgoing requests.
 - Example:
   ```yaml
   targets:
     - host: api.example.com
       ips:
-        - 203.0.113.10   # first IP used
-    - host: www.example.com
+        - 203.0.113.10
+      override_headers:
+        - authorization: "Bearer MY_TOKEN"
+    - host: staging.example.com
       ips:
-        - 93.184.216.34
+        - 203.0.113.10
+      upstream_host: staging-backend.internal.example.com
   ```
 - Behavior derived from conf.yml:
   - DNS: All listed hosts are written to ./dnsmasq.d/dns-hosts and resolve to the internal nginx container IP (default 
-    172.30.0.3) so clients always hit nginx first.
+    172.31.200.3) so clients always hit nginx first.
   - NGINX: For each host, a server block is generated in ./conf-nginx/*.conf from nginx.tmpl.conf, proxying to 
     https://<first_ip> with SNI forwarding enabled and upstream certificate verification off by default.
   - Certificates: A single server cert is created that includes all hosts from conf.yml as SANs, signed by the local 
@@ -165,15 +174,15 @@ Workflow using conf.yml:
    - `./x-docker-up.sh`
 
 Notes and tips:
-- Upstream is contacted via HTTPS to the IP address you provide; proxy_ssl_server_name on ensures SNI uses the requested 
-  host.
-- The nginx internal IP defaults to 172.30.0.3; keep this in sync with compose.yml if you customize networks.
+- **Upstream SNI & Host Headers**: Upstream is contacted via HTTPS to the IP address you provide. By default, the `Host` header and TLS SNI match the requested `host`. Use `upstream_host` if the backend expects a different name (e.g., when the backend uses SNI for routing to a specific virtual host, or if you are pointing a local developer domain at a shared staging endpoint).
+- **Header Overrides**: Use `override_headers` in `conf.yml` to automatically inject or replace HTTP headers (like `Authorization`) for specific hosts.
+- The nginx internal IP defaults to 172.31.200.3; keep this in sync with compose.yml if you customize networks.
 - Only the first IP under ips is used. You can keep additional IPs for documentation or future use.
 
 ## How it works in this repo
-- Networking: docker compose creates a small bridge network (172.30.0.0/29). nginx is assigned 172.30.0.3, dnsmasq 172.30.0.2.
+- Networking: docker compose creates a bridge network (172.31.200.0/24). nginx is assigned 172.31.200.3, dnsmasq 172.31.200.2.
 - Routing: Dante queries the in-stack dnsmasq, which can override configured hostnames in dnsmasq.d/dns-hosts to point 
-  at nginx (172.30.0.3) for TLS termination.
+  at nginx (172.31.200.3) for TLS termination.
 - TLS: nginx serves server.crt.pem/server.key.pem that cover all hostnames listed in dnsmasq.d/dns-hosts and will be 
   trusted by clients that install ca.crt.
 - Upstream: Each generated nginx server config proxies to the backend IP specified for that hostname in dnsmasq.d/dns-hosts 
@@ -188,6 +197,24 @@ Notes and tips:
 ## Overriding Headers
 You can override specific HTTP request headers that nginx forwards upstream without changing any code. This is useful for
 testing client behavior against stable or synthetic header values (e.g., `Authorization`, `User-Agent`, `Accept-Language`).
+
+### 1. Automated Overrides via `conf.yml` (Recommended)
+You can define header overrides directly in your `conf.yml` for each target. The `x-generate.sh` script will automatically generate the NGINX configuration for you.
+
+```yaml
+targets:
+  - host: supernintendoworld-gamehub.universalorlando.com
+    ips:
+      - 184.51.210.215
+    override_headers:
+      - authorization: UEr5FBBk3a6MuKECGT11g2MNqdsw3uTL0xXxpeGLzoMl973cwviPEuyIyBwNAuCO
+      - user-agent: "My-Custom-UA/1.0"
+```
+
+When you run `./x-generate.sh`, it creates `conf-nginx/00-proxy-headers.local.conf` with the appropriate `map` directives, and `conf-nginx/00-proxy-headers-location.inc` with the `proxy_set_header` directives.
+
+### 2. Manual Overrides via `00-proxy-headers.local.conf`
+For more complex logic or global overrides, you can manually edit the local override file.
 
 - Example file (ignored by nginx): `./conf-nginx/00-proxy-headers.local.conf.example`
 - Activate by copying to: `./conf-nginx/00-proxy-headers.local.conf` (note the `00-` prefix)
@@ -205,21 +232,21 @@ map $host $sb_auth {
     default            $http_authorization;    # keep caller's header by default
     api.example.com    "Bearer MY_STATIC_TOKEN";
 }
-proxy_set_header Authorization $sb_auth;
+# proxy_set_header Authorization $sb_auth; (moved to 00-proxy-headers-location.inc)
 
 # User-Agent: per-host override
 map $host $sb_ua {
     default            $http_user_agent;
     api.example.com    "My-UA/1.0 (ShadyBridge)";
 }
-proxy_set_header User-Agent $sb_ua;
+# proxy_set_header User-Agent $sb_ua; (moved to 00-proxy-headers-location.inc)
 
 # Accept-Language: per-host override
 map $host $sb_accept_language {
     default            $http_accept_language;
     api.example.com    "en-US";
 }
-proxy_set_header Accept-Language $sb_accept_language;
+# proxy_set_header Accept-Language $sb_accept_language; (moved to 00-proxy-headers-location.inc)
 ```
 
 Global override (applies to all hosts):
@@ -237,7 +264,6 @@ Activation and validation:
    ```
 2. Re-generate and build the stack, then bring it up (as described above in this README):
    ```bash
-   ./x-docker-build.sh
    ./x-docker-up.sh
    ```
 
