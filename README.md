@@ -199,6 +199,24 @@ Notes and tips:
 You can override specific HTTP request headers that nginx forwards upstream without changing any code. This is useful for
 testing client behavior against stable or synthetic header values (e.g., `Authorization`, `User-Agent`, `Accept-Language`).
 
+### 1. Automated Overrides via `conf.yml` (Recommended)
+You can define header overrides directly in your `conf.yml` for each target. The `x-generate.sh` script will automatically generate the NGINX configuration for you.
+
+```yaml
+targets:
+  - host: supernintendoworld-gamehub.universalorlando.com
+    ips:
+      - 184.51.210.215
+    override_headers:
+      - authorization: UEr5FBBk3a6MuKECGT11g2MNqdsw3uTL0xXxpeGLzoMl973cwviPEuyIyBwNAuCO
+      - user-agent: "My-Custom-UA/1.0"
+```
+
+When you run `./x-generate.sh`, it creates `conf-nginx/00-proxy-headers.local.conf` with the appropriate `map` directives, and `conf-nginx/00-proxy-headers-location.inc` with the `proxy_set_header` directives.
+
+### 2. Manual Overrides via `00-proxy-headers.local.conf`
+For more complex logic or global overrides, you can manually edit the local override file.
+
 - Example file (ignored by nginx): `./conf-nginx/00-proxy-headers.local.conf.example`
 - Activate by copying to: `./conf-nginx/00-proxy-headers.local.conf` (note the `00-` prefix)
 - Do NOT commit secrets contained in your local override file.
@@ -215,21 +233,21 @@ map $host $sb_auth {
     default            $http_authorization;    # keep caller's header by default
     api.example.com    "Bearer MY_STATIC_TOKEN";
 }
-proxy_set_header Authorization $sb_auth;
+# proxy_set_header Authorization $sb_auth; (moved to 00-proxy-headers-location.inc)
 
 # User-Agent: per-host override
 map $host $sb_ua {
     default            $http_user_agent;
     api.example.com    "My-UA/1.0 (ShadyBridge)";
 }
-proxy_set_header User-Agent $sb_ua;
+# proxy_set_header User-Agent $sb_ua; (moved to 00-proxy-headers-location.inc)
 
 # Accept-Language: per-host override
 map $host $sb_accept_language {
     default            $http_accept_language;
     api.example.com    "en-US";
 }
-proxy_set_header Accept-Language $sb_accept_language;
+# proxy_set_header Accept-Language $sb_accept_language; (moved to 00-proxy-headers-location.inc)
 ```
 
 Global override (applies to all hosts):
@@ -247,7 +265,6 @@ Activation and validation:
    ```
 2. Re-generate and build the stack, then bring it up (as described above in this README):
    ```bash
-   ./x-docker-build.sh
    ./x-docker-up.sh
    ```
 

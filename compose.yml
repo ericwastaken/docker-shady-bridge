@@ -8,6 +8,7 @@ services:
       - "--server=9.9.9.9"
       - "--server=1.1.1.1"
       - "--addn-hosts=/etc/dnsmasq.d/dns-hosts"
+      - "--conf-file=/etc/dnsmasq.d/shadybridge.conf"
       - "--log-facility=-"
     volumes:
       - ./dnsmasq.d:/etc/dnsmasq.d:ro
@@ -27,6 +28,8 @@ services:
       dockerfile: Dockerfile-dante
     container_name: shadybridge-dante
     restart: unless-stopped
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
     ports:
       - "1080:1080"
     dns:
