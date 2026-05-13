@@ -1,6 +1,7 @@
 services:
   dns:
     image: jpillora/dnsmasq:latest
+    platform: linux/amd64
     container_name: shadybridge-dns
     restart: unless-stopped
     command:
