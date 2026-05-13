@@ -24,6 +24,7 @@ CURRENT_HOSTNAME=$(hostname)
 
 echo "[x-docker-up] Bringing down any existing docker compose stack..."
 docker compose down --remove-orphans || true
+docker network prune -f
 
 echo "[x-docker-up] Starting docker compose stack..."
 docker compose up -d

@@ -16,6 +16,9 @@ cd "$ROOT_DIR"
 echo "[x-docker-down] Bringing down any existing docker compose stack..."
 docker compose down --remove-orphans || true
 
+echo "[x-docker-down] Pruning unused networks..."
+docker network prune -f
+
 echo "[x-docker-down] Stack is stopped. Current container status:"
 docker compose ps || true
 
