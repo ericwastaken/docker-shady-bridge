@@ -16,12 +16,15 @@
 #   backend IP over HTTPS.
 # - The upstream_host (optional) is used for the HTTP Host header and TLS SNI;
 #   it defaults to the host field if omitted.
-# - The internal NGINX container IP defaults to 172.30.0.3.
+# - The internal NGINX container IP defaults to 172.31.200.3.
 
 targets:
   - host: api.yourhost.com
     ips:
       - x.x.x.x
-  - host: other.youthost.com
+    upstream_host: stg-api.yourhost.com # Optional: if different from host
+    override_headers:
+      - authorization: Bearer YourTokenHere # Optional: overrides for specific host
+  - host: other.yourhost.com
     ips:
       - x.x.x.x

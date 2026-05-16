@@ -78,6 +78,8 @@ read_pairs() {
     in_ips && /^[[:space:]]*-[[:space:]]*/ {
       val=$0; sub(/^[[:space:]]*-[[:space:]]*/,"",val); gsub(/^[[:space:]]+|[[:space:]]+$/,"",val);
       if (ip == "") ip=val;
+      # Stay in in_ips but we only care about the first IP. 
+      # Subsequent entries will be ignored by ip == "" check.
       next
     }
     # override_headers field
@@ -96,6 +98,10 @@ read_pairs() {
       }
       next
     }
+    # Any other field or line should reset in_ips and in_headers if they are not part of the list
+    in_ips && /^[[:space:]]*[A-Za-z0-9_]+:/ && !/ips:/ { in_ips=0 }
+    in_headers && /^[[:space:]]*[A-Za-z0-9_]+:/ && !/override_headers:/ { in_headers=0 }
+    
     END { emit(); }
   ' "$CONF_YML" | sed '/^[[:space:]]*$/d'
 }
@@ -142,15 +148,20 @@ HEADERS_INC_FILE="${NGINX_OUT_DIR}/00-proxy-headers-location.inc"
     echo "    default \$$incoming_var;"
       
     for p in "${PAIRS[@]}"; do
-      IFS='|' read -r ip host upstream headers <<< "$p"
+      # Extract host and headers from the pipe-delimited pair
+      # Format: ip|host|upstream|header_key:header_val,header_key:header_val
+      pair_host=$(echo "$p" | cut -d'|' -f2)
+      pair_headers=$(echo "$p" | cut -d'|' -f4)
+
       # Find the specific header in the headers list for this host
-      # We use a simple loop over the comma-separated headers
-      IFS=',' read -ra HDR_ARR <<< "$headers"
+      # Use a safer way to parse headers that might contain spaces
+      IFS=',' read -ra HDR_ARR <<< "$pair_headers"
       for h in "${HDR_ARR[@]}"; do
+        # We split by first colon to get key and value
         h_key=$(echo "$h" | cut -d':' -f1 | tr '[:upper:]' '[:lower:]')
         h_val=$(echo "$h" | cut -d':' -f2-)
         if [[ "$h_key" == "$key" ]]; then
-          echo "    $host \"$h_val\";"
+          echo "    $pair_host \"$h_val\";"
         fi
       done
     done
